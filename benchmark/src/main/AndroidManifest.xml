@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+    Baseline Profile Generator Module
+
+    This module generates baseline profiles for the app to improve cold start
+    and runtime performance through AOT compilation.
+
+    To generate profiles:
+    ./gradlew :benchmark:pixel6Api31BenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.enabledRules=BaselineProfile
+
+    Or with connected device:
+    ./gradlew :app:generateBaselineProfile
+    -->
+
+    <!-- Required for UIAutomator to interact with the app -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+</manifest>

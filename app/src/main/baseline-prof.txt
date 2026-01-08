@@ -1,0 +1,113 @@
+# Baseline Profile for Aiezzy Slideshow Maker
+# ============================================
+#
+# This file contains rules for AOT compilation of critical code paths.
+# It improves cold start time by 30-50% and reduces jank during first use.
+#
+# To regenerate this profile with actual app usage data:
+# ./gradlew :app:generateBaselineProfile
+#
+# Profile format:
+# - Lines starting with 'H' are "hot" methods (always compiled)
+# - Lines starting with 'S' are "startup" methods (compiled for startup)
+# - Lines starting with 'P' are "post-startup" methods
+# - Lines without prefix are included in all profiles
+#
+# Reference: https://developer.android.com/topic/performance/baselineprofiles
+#
+# Generated: Placeholder (regenerate with actual device testing)
+# ============================================
+
+# ============================================
+# APPLICATION STARTUP
+# ============================================
+
+# Application class
+HSPLcom/aiezzy/slideshowmaker/SlideshowApp;->onCreate()V
+HSPLcom/aiezzy/slideshowmaker/SlideshowApp;-><init>()V
+
+# MainActivity startup
+HSPLcom/aiezzy/slideshowmaker/MainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLcom/aiezzy/slideshowmaker/MainActivity;-><init>()V
+
+# ============================================
+# COMPOSE UI FRAMEWORK
+# ============================================
+
+# Theme setup
+HSPLcom/aiezzy/slideshowmaker/ui/theme/ThemeKt;->**(**)**
+Lcom/aiezzy/slideshowmaker/ui/theme/ThemeKt;
+
+# Navigation
+HSPLcom/aiezzy/slideshowmaker/ui/navigation/AppNavigationKt;->**(**)**
+Lcom/aiezzy/slideshowmaker/ui/navigation/AppNavigationKt;
+
+# ============================================
+# HOME SCREEN (Critical for first impression)
+# ============================================
+
+HSPLcom/aiezzy/slideshowmaker/ui/screens/HomeScreenKt;->**(**)**
+Lcom/aiezzy/slideshowmaker/ui/screens/HomeScreenKt;
+
+# ============================================
+# VIEWMODEL
+# ============================================
+
+HSPLcom/aiezzy/slideshowmaker/viewmodel/SlideshowViewModel;-><init>()V
+HSPLcom/aiezzy/slideshowmaker/viewmodel/SlideshowViewModel;->**(**)**
+Lcom/aiezzy/slideshowmaker/viewmodel/SlideshowViewModel;
+
+# ============================================
+# DATA MODELS (frequently accessed)
+# ============================================
+
+Lcom/aiezzy/slideshowmaker/data/models/ImageItem;
+Lcom/aiezzy/slideshowmaker/data/models/VideoConfig;
+Lcom/aiezzy/slideshowmaker/data/models/VideoResolution;
+Lcom/aiezzy/slideshowmaker/data/models/TransitionEffect;
+Lcom/aiezzy/slideshowmaker/data/models/ProcessingState;
+Lcom/aiezzy/slideshowmaker/data/models/PlatformPreset;
+
+# ============================================
+# TEMPLATES
+# ============================================
+
+Lcom/aiezzy/slideshowmaker/data/templates/TemplatesKt;
+HSPLcom/aiezzy/slideshowmaker/data/templates/TemplatesKt;->**(**)**
+
+# ============================================
+# VIDEO PROCESSING (Background, but pre-warm)
+# ============================================
+
+PLcom/aiezzy/slideshowmaker/util/VideoProcessor;-><init>(Landroid/content/Context;)V
+PLcom/aiezzy/slideshowmaker/util/BitmapPool;-><init>(I)V
+Lcom/aiezzy/slideshowmaker/util/VideoProcessor;
+Lcom/aiezzy/slideshowmaker/util/BitmapPool;
+
+# ============================================
+# ANDROIDX COMPOSE CORE
+# ============================================
+
+HSPLandroidx/compose/runtime/**;->**(**)**
+HSPLandroidx/compose/ui/**;->**(**)**
+HSPLandroidx/compose/foundation/**;->**(**)**
+HSPLandroidx/compose/material3/**;->**(**)**
+
+# ============================================
+# COIL IMAGE LOADING
+# ============================================
+
+HSPLcoil/compose/**;->**(**)**
+Lcoil/compose/AsyncImageKt;
+
+# ============================================
+# NAVIGATION COMPOSE
+# ============================================
+
+HSPLandroidx/navigation/compose/**;->**(**)**
+
+# ============================================
+# KOTLIN COROUTINES (for async operations)
+# ============================================
+
+HSPLkotlinx/coroutines/**;->**(**)**

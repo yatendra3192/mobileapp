@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Aiezzy Slideshow</string>
+    <string name="select_images">Select Images</string>
+    <string name="add_more_images">Add More Images</string>
+    <string name="remove_image">Remove Image</string>
+    <string name="duration_per_image">Duration per Image</string>
+    <string name="seconds">seconds</string>
+    <string name="transition_effect">Transition Effect</string>
+    <string name="fade">Fade</string>
+    <string name="slide">Slide</string>
+    <string name="zoom">Zoom</string>
+    <string name="none">None</string>
+    <string name="resolution">Resolution</string>
+    <string name="stories_hd">Stories/Reels HD (720x1280)</string>
+    <string name="stories_fhd">Stories/Reels Full HD (1080x1920)</string>
+    <string name="youtube_hd">YouTube HD (1280x720)</string>
+    <string name="youtube_fhd">YouTube Full HD (1920x1080)</string>
+    <string name="background_music">Background Music</string>
+    <string name="select_audio">Select Audio</string>
+    <string name="no_audio">No Audio</string>
+    <string name="audio_selected">Audio Selected</string>
+    <string name="trim_audio">Trim Audio</string>
+    <string name="start_time">Start Time</string>
+    <string name="end_time">End Time</string>
+    <string name="use_full_audio">Use Full Audio</string>
+    <string name="generate_video">Generate Video</string>
+    <string name="generating_video">Generating Video...</string>
+    <string name="video_ready">Video Ready!</string>
+    <string name="preview">Preview</string>
+    <string name="download">Download</string>
+    <string name="share">Share</string>
+    <string name="cancel">Cancel</string>
+    <string name="error">Error</string>
+    <string name="processing">Processing...</string>
+    <string name="images_selected">%d images selected</string>
+    <string name="drag_to_reorder">Drag to reorder</string>
+    <string name="no_images_selected">No images selected</string>
+    <string name="permission_required">Permission Required</string>
+    <string name="storage_permission_message">Storage permission is required to select images and save videos.</string>
+    <string name="grant_permission">Grant Permission</string>
+</resources>
