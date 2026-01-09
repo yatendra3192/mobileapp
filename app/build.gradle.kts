@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.androidx.baselineprofile)
+    alias(libs.plugins.ksp)
 }
 
 // Load local.properties for signing config
@@ -136,6 +137,14 @@ dependencies {
 
     // ExifInterface for image rotation handling
     implementation(libs.androidx.exifinterface)
+
+    // Face Grouping Feature - ML Kit, TFLite, Room, WorkManager
+    implementation(libs.mlkit.face.detection)
+    implementation(libs.tensorflow.lite)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+    implementation(libs.work.runtime.ktx)
 
     // Baseline Profile - enables AOT compilation of critical code paths
     implementation(libs.androidx.profileinstaller)

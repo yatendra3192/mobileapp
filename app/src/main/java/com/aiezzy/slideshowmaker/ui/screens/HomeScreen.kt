@@ -64,6 +64,7 @@ import com.aiezzy.slideshowmaker.data.models.VideoTemplate
 import com.aiezzy.slideshowmaker.data.models.PlatformPreset
 import com.aiezzy.slideshowmaker.ui.components.*
 import com.aiezzy.slideshowmaker.ui.theme.*
+import com.aiezzy.slideshowmaker.viewmodel.PeopleViewModel
 import com.aiezzy.slideshowmaker.viewmodel.SlideshowViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -94,9 +95,11 @@ data class SavedVideo(
 @Composable
 fun HomeScreen(
     viewModel: SlideshowViewModel,
+    peopleViewModel: PeopleViewModel? = null,
     onNavigateToSettings: () -> Unit,
     onNavigateToProcessing: () -> Unit = {},
-    onNavigateToPreview: (String) -> Unit = {}
+    onNavigateToPreview: (String) -> Unit = {},
+    onNavigateToPeople: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -177,6 +180,8 @@ fun HomeScreen(
                 },
                 onSettingsClick = onNavigateToSettings,
                 onRefreshVideos = { savedVideos = loadSavedVideos(context) },
+                peopleViewModel = peopleViewModel,
+                onNavigateToPeople = onNavigateToPeople,
                 modifier = Modifier.padding(paddingValues)
             )
         } else {
@@ -211,8 +216,15 @@ private fun NewHomeLayout(
     onVideoClick: (SavedVideo) -> Unit,
     onSettingsClick: () -> Unit,
     onRefreshVideos: () -> Unit,
+    peopleViewModel: PeopleViewModel?,
+    onNavigateToPeople: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // People state
+    val persons = peopleViewModel?.persons?.collectAsState()?.value ?: emptyList()
+    val scanProgress = peopleViewModel?.scanProgress?.collectAsState()?.value
+    val isScanRunning = peopleViewModel?.isScanRunning?.collectAsState()?.value ?: false
+    val scanPercentage = peopleViewModel?.scanPercentage?.collectAsState()?.value ?: 0f
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -310,6 +322,32 @@ private fun NewHomeLayout(
                     )
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // People and Albums Cards Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // People and pets card
+            PeopleCard(
+                persons = persons.take(4),
+                scanProgress = scanPercentage,
+                isScanning = isScanRunning,
+                onClick = onNavigateToPeople,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Albums card (placeholder)
+            AlbumsCard(
+                albumCount = savedVideos.size,
+                onClick = { /* TODO: Navigate to albums */ },
+                modifier = Modifier.weight(1f)
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))

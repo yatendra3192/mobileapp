@@ -10,9 +10,12 @@ import androidx.navigation.navArgument
 import com.aiezzy.slideshowmaker.data.models.MusicMood
 import com.aiezzy.slideshowmaker.ui.screens.HomeScreen
 import com.aiezzy.slideshowmaker.ui.screens.MusicLibraryScreen
+import com.aiezzy.slideshowmaker.ui.screens.PeopleScreen
+import com.aiezzy.slideshowmaker.ui.screens.PersonDetailScreen
 import com.aiezzy.slideshowmaker.ui.screens.PreviewScreen
 import com.aiezzy.slideshowmaker.ui.screens.ProcessingScreen
 import com.aiezzy.slideshowmaker.ui.screens.SettingsScreen
+import com.aiezzy.slideshowmaker.viewmodel.PeopleViewModel
 import com.aiezzy.slideshowmaker.viewmodel.SlideshowViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -33,12 +36,19 @@ sealed class Screen(val route: String) {
             return if (mood != null) "music_library?mood=${mood.name}" else "music_library"
         }
     }
+    object People : Screen("people")
+    object PersonDetail : Screen("person/{personId}") {
+        fun createRoute(personId: String): String {
+            return "person/$personId"
+        }
+    }
 }
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
     val viewModel: SlideshowViewModel = viewModel()
+    val peopleViewModel: PeopleViewModel = viewModel()
 
     NavHost(
         navController = navController,
@@ -47,6 +57,7 @@ fun AppNavigation() {
         composable(Screen.Home.route) {
             HomeScreen(
                 viewModel = viewModel,
+                peopleViewModel = peopleViewModel,
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
                 },
@@ -57,6 +68,9 @@ fun AppNavigation() {
                 },
                 onNavigateToPreview = { videoPath ->
                     navController.navigate(Screen.Preview.createRoute(videoPath))
+                },
+                onNavigateToPeople = {
+                    navController.navigate(Screen.People.route)
                 }
             )
         }
@@ -130,6 +144,41 @@ fun AppNavigation() {
                 },
                 onNavigateBack = {
                     navController.popBackStack()
+                }
+            )
+        }
+
+        // People screen - face grouping
+        composable(Screen.People.route) {
+            PeopleScreen(
+                viewModel = peopleViewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onPersonClick = { personId ->
+                    navController.navigate(Screen.PersonDetail.createRoute(personId))
+                }
+            )
+        }
+
+        // Person detail screen - filtered photos
+        composable(
+            route = Screen.PersonDetail.route,
+            arguments = listOf(navArgument("personId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val personId = backStackEntry.arguments?.getString("personId") ?: ""
+            PersonDetailScreen(
+                viewModel = peopleViewModel,
+                personId = personId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onCreateSlideshow = { selectedUris ->
+                    // Add selected photos to slideshow and navigate to settings
+                    viewModel.setImages(selectedUris)
+                    navController.navigate(Screen.Settings.route) {
+                        popUpTo(Screen.Home.route)
+                    }
                 }
             )
         }

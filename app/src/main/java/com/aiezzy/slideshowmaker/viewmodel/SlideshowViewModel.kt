@@ -86,6 +86,16 @@ class SlideshowViewModel : ViewModel() {
         _images.value = currentImages + newImages
     }
 
+    /**
+     * Set images directly, replacing any existing selection.
+     * Used when selecting filtered photos from face grouping.
+     */
+    fun setImages(uris: List<Uri>) {
+        _images.value = uris.mapIndexed { index, uri ->
+            ImageItem(uri = uri, order = index)
+        }
+    }
+
     fun removeImage(imageId: String) {
         _images.value = _images.value.filter { it.id != imageId }
             .mapIndexed { index, item -> item.copy(order = index) }
