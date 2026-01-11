@@ -230,6 +230,11 @@ private fun NewHomeLayout(
         is PeopleViewModel.PeopleUiState.Success -> uiState.persons
         else -> emptyList()
     }
+
+    // Auto-start scanning when app launches (for new photos)
+    LaunchedEffect(Unit) {
+        peopleViewModel?.startGalleryScan(forceRescan = false)
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -267,95 +272,58 @@ private fun NewHomeLayout(
             }
         }
 
-        // Hero Gradient Section
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .height(180.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFF1a1a2e),
-                            Color(0xFF16213e),
-                            Color(0xFF0f3460),
-                            Color(0xFFe94560).copy(alpha = 0.6f)
-                        )
-                    )
-                )
-        ) {
-            // Animated gradient overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFFFF6B6B).copy(alpha = 0.3f),
-                                Color(0xFF4ECDC4).copy(alpha = 0.2f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-
-            // AI Powered badge
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(12.dp),
-                shape = RoundedCornerShape(20.dp),
-                color = CardBackground
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        tint = AccentYellow,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = "AI Powered",
-                        style = AiezzyType.labelSmall,
-                        color = Color.White,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // People and Albums Cards Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // People and pets card
+        // People and pets section - only show when scan is complete and faces found
+        if (!isScanRunning && persons.isNotEmpty()) {
+            // People and pets card (full width, no Albums)
             PeopleCard(
                 persons = persons.take(4),
                 scanProgress = scanPercentage,
                 isScanning = isScanRunning,
                 onClick = onNavigateToPeople,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
             )
 
-            // Albums card (placeholder)
-            AlbumsCard(
-                albumCount = savedVideos.size,
-                onClick = { /* TODO: Navigate to albums */ },
-                modifier = Modifier.weight(1f)
-            )
+            Spacer(modifier = Modifier.height(24.dp))
+        } else if (isScanRunning) {
+            // Show scanning progress
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+                color = CardBackground,
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(20.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(
+                        progress = { scanPercentage },
+                        modifier = Modifier.size(48.dp),
+                        color = AccentYellow,
+                        trackColor = Color.White.copy(alpha = 0.2f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Scanning photos for faces...",
+                        style = AiezzyType.bodyMedium,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "${(scanPercentage * 100).toInt()}% complete",
+                        style = AiezzyType.bodySmall,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
 
         // Create New Slideshow Section
         Column(
