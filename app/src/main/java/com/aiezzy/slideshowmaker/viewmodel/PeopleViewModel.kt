@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aiezzy.slideshowmaker.data.face.entities.DetectedFaceEntity
 import com.aiezzy.slideshowmaker.data.face.entities.PersonWithFace
 import com.aiezzy.slideshowmaker.data.face.entities.ScanProgressEntity
 import com.aiezzy.slideshowmaker.face.FaceRepository
@@ -369,8 +370,10 @@ class PeopleViewModel @Inject constructor(
                     // This prevents race conditions during active scanning
                     val isNowComplete = newState is ScanState.Complete
                     if (wasScanning && isNowComplete) {
-                        Log.i(TAG, "Scan completed, fixing orphaned clusters")
+                        Log.i(TAG, "Scan completed, fixing orphaned clusters and reloading persons")
                         fixOrphanedClustersIfNeeded()
+                        // Reload persons to show newly detected faces
+                        loadPersons()
                     }
 
                     wasScanning = newState is ScanState.Scanning
@@ -677,6 +680,40 @@ class PeopleViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating person profile", e)
                 _errorMessage.emit("Failed to update profile")
+            }
+        }
+    }
+
+    /**
+     * Get all faces for a person (for thumbnail selection).
+     * Returns faces ordered by quality score (best first).
+     */
+    suspend fun getFacesForPerson(personId: String): List<DetectedFaceEntity> {
+        return try {
+            repository.getFacesForPerson(personId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting faces for person $personId", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Set a specific face as the thumbnail for a person.
+     */
+    fun setPersonThumbnail(personId: String, faceId: String) {
+        viewModelScope.launch {
+            try {
+                val success = repository.setPersonThumbnail(personId, faceId)
+                if (success) {
+                    // Refresh person data to show new thumbnail
+                    loadPersons()
+                    _successMessage.emit("Thumbnail updated")
+                } else {
+                    _errorMessage.emit("Failed to update thumbnail")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting thumbnail", e)
+                _errorMessage.emit("Failed to update thumbnail")
             }
         }
     }

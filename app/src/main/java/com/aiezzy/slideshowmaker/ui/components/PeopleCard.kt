@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -263,6 +264,7 @@ fun PersonFilterChip(
 
 /**
  * "People and pets" card for home screen - compact horizontal layout
+ * Always visible - shows faces, scanning placeholder, or empty state
  */
 @Composable
 fun PeopleCard(
@@ -285,51 +287,89 @@ fun PeopleCard(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Compact horizontal row of face thumbnails
-            if (persons.isNotEmpty()) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy((-12).dp), // Overlapping effect
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    persons.take(4).forEachIndexed { index, person ->
-                        CompactFaceThumbnail(
-                            person = person,
-                            size = 48.dp,
-                            modifier = Modifier.offset(x = 0.dp) // Stack effect
-                        )
-                    }
-
-                    // Show count if more than 4 persons
-                    if (persons.size > 4) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(Color.White.copy(alpha = 0.2f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "+${persons.size - 4}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
+            // Thumbnail area - show faces, placeholder circles, or icon
+            when {
+                persons.isNotEmpty() -> {
+                    // Show face thumbnails
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy((-12).dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        persons.take(4).forEachIndexed { index, person ->
+                            CompactFaceThumbnail(
+                                person = person,
+                                size = 48.dp,
+                                modifier = Modifier.offset(x = 0.dp)
                             )
                         }
+
+                        if (persons.size > 4) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "+${persons.size - 4}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+                isScanning -> {
+                    // Show placeholder circles while scanning
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy((-12).dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(3) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(Color.White.copy(alpha = 0.1f), CircleShape)
+                                    .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    // Show face icon placeholder when no faces and not scanning
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(Color.White.copy(alpha = 0.1f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Face,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.4f),
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Label and arrow
+            // Label and subtitle
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "People and pets",
+                    text = "Find photos",
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "${persons.size} people found",
+                    text = when {
+                        isScanning -> "Scanning..."
+                        persons.isEmpty() -> "by face"
+                        else -> "by face"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )

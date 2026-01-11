@@ -226,6 +226,9 @@ private fun NewHomeLayout(
     val isScanRunning = peopleViewModel?.isScanRunning?.collectAsState()?.value ?: false
     val scanPercentage = peopleViewModel?.scanPercentage?.collectAsState()?.value ?: 0f
 
+    // Error dialog state
+    var showErrorDialog by remember { mutableStateOf(false) }
+
     val persons = when (uiState) {
         is PeopleViewModel.PeopleUiState.Success -> uiState.persons
         else -> emptyList()
@@ -254,13 +257,62 @@ private fun NewHomeLayout(
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = onRefreshVideos) {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = "Refresh",
-                        tint = Color.White.copy(alpha = 0.7f)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Scan status indicator with text
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            enabled = scanState is PeopleViewModel.ScanState.Error,
+                            onClick = { showErrorDialog = true }
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Indicator dot
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(
+                                color = when (scanState) {
+                                    is PeopleViewModel.ScanState.Scanning -> Color(0xFF4CAF50)  // Green
+                                    is PeopleViewModel.ScanState.Paused -> Color(0xFFFF9800)    // Orange
+                                    is PeopleViewModel.ScanState.Error -> Color(0xFFE53935)     // Red
+                                    else -> Color(0xFF2196F3)                                   // Blue (Idle/Complete)
+                                },
+                                shape = CircleShape
+                            )
                     )
+
+                    // Status text (only when relevant)
+                    when (scanState) {
+                        is PeopleViewModel.ScanState.Scanning -> {
+                            Text(
+                                text = "${scanState.scannedCount}/${scanState.totalCount}",
+                                style = AiezzyType.labelSmall,
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 10.sp
+                            )
+                        }
+                        is PeopleViewModel.ScanState.Paused -> {
+                            Text(
+                                text = "Paused",
+                                style = AiezzyType.labelSmall,
+                                color = Color(0xFFFF9800),
+                                fontSize = 10.sp
+                            )
+                        }
+                        is PeopleViewModel.ScanState.Error -> {
+                            Text(
+                                text = "Error",
+                                style = AiezzyType.labelSmall,
+                                color = Color(0xFFE53935),
+                                fontSize = 10.sp
+                            )
+                        }
+                        else -> { /* No text for Idle/Complete */ }
+                    }
                 }
                 IconButton(onClick = onSettingsClick) {
                     Icon(
@@ -272,21 +324,18 @@ private fun NewHomeLayout(
             }
         }
 
-        // People and pets section - only show when faces are found (hide during scanning)
-        if (persons.isNotEmpty()) {
-            // People and pets card (full width, compact design)
-            PeopleCard(
-                persons = persons.take(4),
-                scanProgress = null,
-                isScanning = false,
-                onClick = onNavigateToPeople,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-            )
+        // People and pets section - always show (with faces, scanning, or empty)
+        PeopleCard(
+            persons = persons.take(4),
+            scanProgress = if (scanState is PeopleViewModel.ScanState.Scanning) scanState.progress else null,
+            isScanning = scanState is PeopleViewModel.ScanState.Scanning,
+            onClick = onNavigateToPeople,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        )
 
-            Spacer(modifier = Modifier.height(24.dp))
-        }
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Create New Slideshow Section
         Column(
@@ -422,6 +471,42 @@ private fun NewHomeLayout(
                 )
             }
         }
+    }
+
+    // Error dialog for scan failures
+    if (showErrorDialog && scanState is PeopleViewModel.ScanState.Error) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = {
+                Text(
+                    text = "Scan Failed",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = (scanState as PeopleViewModel.ScanState.Error).message,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        peopleViewModel?.startGalleryScan(forceRescan = true)
+                        showErrorDialog = false
+                    }
+                ) {
+                    Text("Retry", color = AccentYellow)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showErrorDialog = false }) {
+                    Text("Dismiss", color = Color.White.copy(alpha = 0.6f))
+                }
+            },
+            containerColor = CardBackground
+        )
     }
 }
 

@@ -7,9 +7,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.platform.LocalContext
+import android.net.Uri
+import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import com.aiezzy.slideshowmaker.data.face.entities.DetectedFaceEntity
+import com.aiezzy.slideshowmaker.ui.components.FaceCropTransformation
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -97,6 +110,7 @@ fun PeopleScreen(
 
     var showRenameDialog by remember { mutableStateOf<PersonWithFace?>(null) }
     var showMenu by remember { mutableStateOf(false) }
+    var showRescanWarning by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -157,7 +171,7 @@ fun PeopleScreen(
                                     text = { Text("Rescan gallery", color = Color.White) },
                                     onClick = {
                                         showMenu = false
-                                        viewModel.resetAndRescan()
+                                        showRescanWarning = true
                                     },
                                     leadingIcon = {
                                         Icon(
@@ -326,8 +340,8 @@ fun PeopleScreen(
                                     },
                                     onLongClick = {
                                         if (!mergeSelectionMode) {
-                                            viewModel.enterMergeMode()
-                                            viewModel.toggleMergeSelection(person.personId)
+                                            // Show edit dialog on long press
+                                            showRenameDialog = person
                                         }
                                     }
                                 )
@@ -339,10 +353,11 @@ fun PeopleScreen(
         }
     }
 
-    // Edit person dialog (name + birthday)
+    // Edit person dialog (name + birthday + thumbnail)
     showRenameDialog?.let { person ->
-        RenamePersonDialog(
+        EditPersonDialog(
             person = person,
+            viewModel = viewModel,
             onDismiss = { showRenameDialog = null },
             onConfirm = { newName, birthday ->
                 viewModel.updatePersonProfile(person.personId, newName, birthday)
@@ -351,6 +366,83 @@ fun PeopleScreen(
             onHide = {
                 viewModel.hidePerson(person.personId)
                 showRenameDialog = null
+            }
+        )
+    }
+
+    // Rescan warning dialog
+    if (showRescanWarning) {
+        AlertDialog(
+            onDismissRequest = { showRescanWarning = false },
+            containerColor = CardBackground,
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFFF9800),
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Rescan Gallery?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "This will take a long time to complete.",
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "All your saved data will be lost:",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "• Names you've given to people",
+                        color = Color.White.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "• Merged face groups",
+                        color = Color.White.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "• Birthday information",
+                        color = Color.White.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showRescanWarning = false
+                        viewModel.resetAndRescan()
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Color(0xFFFF9800)
+                    )
+                ) {
+                    Text("Rescan Anyway")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showRescanWarning = false },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Color.White.copy(alpha = 0.7f)
+                    )
+                ) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -740,18 +832,34 @@ private fun PersonGridItem(
 }
 
 /**
- * Dialog for editing a person's profile (name, birthday)
+ * Dialog for editing a person's profile (name, birthday, thumbnail)
  */
 @Composable
-private fun RenamePersonDialog(
+private fun EditPersonDialog(
     person: PersonWithFace,
+    viewModel: PeopleViewModel,
     onDismiss: () -> Unit,
     onConfirm: (name: String, birthday: String?) -> Unit,
     onHide: () -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var name by remember { mutableStateOf(person.name ?: "") }
     var birthday by remember { mutableStateOf(person.birthday ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
+
+    // Faces for thumbnail selection
+    var faces by remember { mutableStateOf<List<DetectedFaceEntity>>(emptyList()) }
+    var selectedFaceId by remember { mutableStateOf(person.faceId) }
+    var isLoadingFaces by remember { mutableStateOf(true) }
+
+    // Load faces when dialog opens
+    LaunchedEffect(person.personId) {
+        isLoadingFaces = true
+        faces = viewModel.getFacesForPerson(person.personId)
+        isLoadingFaces = false
+    }
 
     // Parse existing birthday for display
     val birthdayDisplay = remember(birthday) {
@@ -779,7 +887,82 @@ private fun RenamePersonDialog(
             )
         },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                // Thumbnail selection section
+                Text(
+                    text = "Profile photo",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (isLoadingFaces) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = AccentYellow,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                } else if (faces.isNotEmpty()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(faces.take(10)) { face ->
+                            val isSelected = face.faceId == selectedFaceId
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .border(
+                                        width = if (isSelected) 3.dp else 1.dp,
+                                        color = if (isSelected) AccentYellow else Color.White.copy(alpha = 0.3f),
+                                        shape = CircleShape
+                                    )
+                                    .clickable { selectedFaceId = face.faceId }
+                            ) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(Uri.parse(face.photoUri))
+                                        .memoryCachePolicy(CachePolicy.ENABLED)
+                                        .diskCachePolicy(CachePolicy.ENABLED)
+                                        .crossfade(true)
+                                        .transformations(
+                                            FaceCropTransformation(
+                                                left = face.boundingBoxLeft,
+                                                top = face.boundingBoxTop,
+                                                right = face.boundingBoxRight,
+                                                bottom = face.boundingBoxBottom,
+                                                padding = 0.25f
+                                            )
+                                        )
+                                        .build(),
+                                    contentDescription = "Face option",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Tap to select profile photo",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Name field
                 OutlinedTextField(
                     value = name,
@@ -851,14 +1034,6 @@ private fun RenamePersonDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "We'll notify you on their birthday!",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.5f)
-                )
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Hide button
@@ -880,7 +1055,13 @@ private fun RenamePersonDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(name, birthday.ifBlank { null }) },
+                onClick = {
+                    // Update thumbnail if changed
+                    if (selectedFaceId != person.faceId) {
+                        viewModel.setPersonThumbnail(person.personId, selectedFaceId)
+                    }
+                    onConfirm(name, birthday.ifBlank { null })
+                },
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = AccentYellow
                 )

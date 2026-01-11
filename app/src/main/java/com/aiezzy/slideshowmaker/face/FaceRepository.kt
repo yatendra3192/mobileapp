@@ -2167,6 +2167,32 @@ class FaceRepository @Inject constructor(
     }
 
     /**
+     * Get all faces for a person, ordered by quality score (best first).
+     * Used for thumbnail selection UI.
+     */
+    suspend fun getFacesForPerson(personId: String): List<DetectedFaceEntity> {
+        return detectedFaceDao.getFacesForPerson(personId)
+            .sortedByDescending { it.qualityScore }
+    }
+
+    /**
+     * Set a specific face as the thumbnail/representative for a person.
+     * @param personId The person to update
+     * @param faceId The face to use as thumbnail
+     * @return true if updated successfully
+     */
+    suspend fun setPersonThumbnail(personId: String, faceId: String): Boolean {
+        return try {
+            personDao.updateRepresentativeFace(personId, faceId)
+            Log.i(TAG, "Set thumbnail for person $personId to face $faceId")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting thumbnail for person $personId", e)
+            false
+        }
+    }
+
+    /**
      * Calculate cosine similarity between two embeddings.
      */
     private fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
