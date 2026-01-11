@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -261,7 +262,7 @@ fun PersonFilterChip(
 }
 
 /**
- * "People and pets" card for home screen
+ * "People and pets" card for home screen - compact horizontal layout
  */
 @Composable
 fun PeopleCard(
@@ -278,122 +279,107 @@ fun PeopleCard(
         color = CardBackground,
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth()
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Face grid (2x2)
+            // Compact horizontal row of face thumbnails
             if (persons.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1.2f)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy((-12).dp), // Overlapping effect
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 2x2 grid of faces
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            persons.getOrNull(0)?.let { person ->
-                                FaceThumbnailGridItem(
-                                    person = person,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            } ?: Spacer(modifier = Modifier.weight(1f))
-
-                            persons.getOrNull(1)?.let { person ->
-                                FaceThumbnailGridItem(
-                                    person = person,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            } ?: Spacer(modifier = Modifier.weight(1f))
-                        }
-
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            persons.getOrNull(2)?.let { person ->
-                                FaceThumbnailGridItem(
-                                    person = person,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            } ?: Spacer(modifier = Modifier.weight(1f))
-
-                            persons.getOrNull(3)?.let { person ->
-                                FaceThumbnailGridItem(
-                                    person = person,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            } ?: Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            } else {
-                // Empty state or scanning
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1.2f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isScanning) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            CircularProgressIndicator(
-                                progress = { scanProgress ?: 0f },
-                                modifier = Modifier.size(40.dp),
-                                color = AccentYellow,
-                                trackColor = Color.White.copy(alpha = 0.2f)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Scanning...",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.6f)
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = "No faces found yet",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.6f)
+                    persons.take(4).forEachIndexed { index, person ->
+                        CompactFaceThumbnail(
+                            person = person,
+                            size = 48.dp,
+                            modifier = Modifier.offset(x = 0.dp) // Stack effect
                         )
                     }
+
+                    // Show count if more than 4 persons
+                    if (persons.size > 4) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "+${persons.size - 4}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
-            // Label
-            Text(
-                text = "People and pets",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
-                fontWeight = FontWeight.Medium
-            )
-
-            // Scanning progress bar
-            if (isScanning && scanProgress != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                LinearProgressIndicator(
-                    progress = { scanProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .clip(RoundedCornerShape(1.dp)),
-                    color = AccentYellow,
-                    trackColor = Color.White.copy(alpha = 0.2f)
+            // Label and arrow
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "People and pets",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "${persons.size} people found",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.6f)
                 )
             }
+
+            // Arrow icon
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "View all",
+                tint = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
+}
+
+/**
+ * Compact face thumbnail for horizontal display
+ */
+@Composable
+private fun CompactFaceThumbnail(
+    person: PersonWithFace,
+    size: Dp,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    AsyncImage(
+        model = ImageRequest.Builder(context)
+            .data(Uri.parse(person.photoUri))
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .crossfade(true)
+            .transformations(
+                FaceCropTransformation(
+                    left = person.boundingBoxLeft,
+                    top = person.boundingBoxTop,
+                    right = person.boundingBoxRight,
+                    bottom = person.boundingBoxBottom,
+                    padding = 0.25f
+                )
+            )
+            .build(),
+        contentDescription = person.getDisplayName(),
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .border(2.dp, CardBackground, CircleShape),
+        contentScale = ContentScale.Crop
+    )
 }
 
 /**

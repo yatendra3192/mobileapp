@@ -272,55 +272,18 @@ private fun NewHomeLayout(
             }
         }
 
-        // People and pets section - only show when scan is complete and faces found
-        if (!isScanRunning && persons.isNotEmpty()) {
-            // People and pets card (full width, no Albums)
+        // People and pets section - only show when faces are found (hide during scanning)
+        if (persons.isNotEmpty()) {
+            // People and pets card (full width, compact design)
             PeopleCard(
                 persons = persons.take(4),
-                scanProgress = scanPercentage,
-                isScanning = isScanRunning,
+                scanProgress = null,
+                isScanning = false,
                 onClick = onNavigateToPeople,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
             )
-
-            Spacer(modifier = Modifier.height(24.dp))
-        } else if (isScanRunning) {
-            // Show scanning progress
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .clip(RoundedCornerShape(16.dp)),
-                color = CardBackground,
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(20.dp)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator(
-                        progress = { scanPercentage },
-                        modifier = Modifier.size(48.dp),
-                        color = AccentYellow,
-                        trackColor = Color.White.copy(alpha = 0.2f)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Scanning photos for faces...",
-                        style = AiezzyType.bodyMedium,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "${(scanPercentage * 100).toInt()}% complete",
-                        style = AiezzyType.bodySmall,
-                        color = Color.White.copy(alpha = 0.6f)
-                    )
-                }
-            }
 
             Spacer(modifier = Modifier.height(24.dp))
         }
