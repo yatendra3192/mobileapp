@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.androidx.baselineprofile)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.hilt.android)
 }
 
 // Load local.properties for signing config
@@ -83,6 +85,38 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // ABI splits - build separate APKs for each architecture
+    // This significantly reduces APK size by excluding unused native libraries
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            // Include only ARM architectures (covers 99%+ of real devices)
+            // x86/x86_64 are mainly for emulators
+            include("armeabi-v7a", "arm64-v8a", "x86_64")
+            // Set to true to also generate a universal APK (larger, but works everywhere)
+            isUniversalApk = false
+        }
+    }
+
+    // Assign version codes to ABI-specific APKs
+    // Higher version codes for newer architectures ensures proper updates
+    android.applicationVariants.all {
+        val variant = this
+        variant.outputs.forEach { output ->
+            if (output is com.android.build.gradle.internal.api.ApkVariantOutputImpl) {
+                val abiFilter = output.getFilter(com.android.build.api.variant.FilterConfiguration.FilterType.ABI.name)
+                val abiVersionCode = when (abiFilter) {
+                    "armeabi-v7a" -> 1
+                    "arm64-v8a" -> 2
+                    "x86_64" -> 3
+                    else -> 0
+                }
+                output.versionCodeOverride = (variant.versionCode ?: 1) * 10 + abiVersionCode
+            }
+        }
+    }
 }
 
 // Baseline Profile configuration
@@ -145,6 +179,13 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.work.runtime.ktx)
+
+    // Hilt Dependency Injection (using kapt for stability)
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+    implementation(libs.hilt.work)
+    kapt(libs.hilt.work.compiler)
+    implementation(libs.hilt.navigation.compose)
 
     // Baseline Profile - enables AOT compilation of critical code paths
     implementation(libs.androidx.profileinstaller)

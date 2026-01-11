@@ -2,21 +2,26 @@ package com.aiezzy.slideshowmaker
 
 import android.app.Application
 import android.content.ComponentCallbacks2
-import android.os.Build
 import android.util.Log
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import coil.util.DebugLogger
+import com.aiezzy.slideshowmaker.face.notification.BirthdayNotificationWorker
 import com.aiezzy.slideshowmaker.util.VideoProcessor
+import dagger.hilt.android.HiltAndroidApp
 import java.io.File
+import javax.inject.Inject
 
 private const val TAG = "SlideshowApp"
 
 /**
- * Application class with optimized Coil image caching configuration.
+ * Application class with optimized Coil image caching configuration
+ * and Hilt dependency injection setup.
  *
  * Memory cache: 25% of available heap (typically 32-64MB)
  * Disk cache: 100MB for thumbnails
@@ -25,14 +30,49 @@ private const val TAG = "SlideshowApp"
  * - Fast grid scrolling (images cached in memory)
  * - Reduced network/disk I/O (disk cache for persistence)
  * - Proper memory management under pressure
+ * - Hilt worker factory for WorkManager integration
  */
-class SlideshowApp : Application(), ImageLoaderFactory {
+@HiltAndroidApp
+class SlideshowApp : Application(), ImageLoaderFactory, Configuration.Provider {
+
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
 
     override fun onCreate() {
         super.onCreate()
         instance = this
-        Log.d(TAG, "SlideshowApp initialized with optimized Coil caching")
+        Log.d(TAG, "SlideshowApp initialized with optimized Coil caching and Hilt")
+
+        // Initialize birthday notifications
+        initializeBirthdayNotifications()
     }
+
+    /**
+     * Initialize birthday notification system.
+     * Creates notification channel and schedules daily birthday checks.
+     */
+    private fun initializeBirthdayNotifications() {
+        try {
+            // Create notification channel (required for Android 8+)
+            BirthdayNotificationWorker.createNotificationChannel(this)
+
+            // Schedule daily birthday check at 9 AM
+            BirthdayNotificationWorker.schedule(this)
+
+            Log.d(TAG, "Birthday notifications initialized")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize birthday notifications", e)
+        }
+    }
+
+    /**
+     * Provides WorkManager configuration with Hilt worker factory.
+     * This enables dependency injection in WorkManager workers.
+     */
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
     /**
      * Creates a custom ImageLoader with optimized caching for grid performance.

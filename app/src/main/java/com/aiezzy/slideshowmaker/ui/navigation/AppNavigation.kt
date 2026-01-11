@@ -1,6 +1,7 @@
 package com.aiezzy.slideshowmaker.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -48,7 +49,7 @@ sealed class Screen(val route: String) {
 fun AppNavigation() {
     val navController = rememberNavController()
     val viewModel: SlideshowViewModel = viewModel()
-    val peopleViewModel: PeopleViewModel = viewModel()
+    val peopleViewModel: PeopleViewModel = hiltViewModel()
 
     NavHost(
         navController = navController,

@@ -1,5 +1,6 @@
 package com.aiezzy.slideshowmaker.ui.components
 
+import android.graphics.Bitmap
 import android.graphics.RectF
 import android.net.Uri
 import androidx.compose.animation.core.*
@@ -30,12 +31,53 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import coil.size.Size
+import coil.transform.Transformation
 import com.aiezzy.slideshowmaker.data.face.entities.PersonWithFace
 
 // Theme colors matching the app
 private val AccentYellow = Color(0xFFE5FF00)
 private val DarkBackground = Color(0xFF1A1A1A)
 private val CardBackground = Color(0xFF2A2A2A)
+
+/**
+ * Custom Coil transformation to crop to face bounding box
+ */
+class FaceCropTransformation(
+    private val left: Float,
+    private val top: Float,
+    private val right: Float,
+    private val bottom: Float,
+    private val padding: Float = 0.2f  // Add padding around face
+) : Transformation {
+
+    override val cacheKey: String = "face_crop_${left}_${top}_${right}_${bottom}_$padding"
+
+    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+        val width = input.width
+        val height = input.height
+
+        // Convert normalized coordinates to pixel coordinates
+        val faceWidth = (right - left) * width
+        val faceHeight = (bottom - top) * height
+        val paddingX = faceWidth * padding
+        val paddingY = faceHeight * padding
+
+        val cropLeft = ((left * width) - paddingX).coerceAtLeast(0f).toInt()
+        val cropTop = ((top * height) - paddingY).coerceAtLeast(0f).toInt()
+        val cropRight = ((right * width) + paddingX).coerceAtMost(width.toFloat()).toInt()
+        val cropBottom = ((bottom * height) + paddingY).coerceAtMost(height.toFloat()).toInt()
+
+        val cropWidth = (cropRight - cropLeft).coerceAtLeast(1)
+        val cropHeight = (cropBottom - cropTop).coerceAtLeast(1)
+
+        return try {
+            Bitmap.createBitmap(input, cropLeft, cropTop, cropWidth, cropHeight)
+        } catch (e: Exception) {
+            input // Return original if crop fails
+        }
+    }
+}
 
 /**
  * Circular face thumbnail with optional selection state
@@ -66,15 +108,24 @@ fun FaceThumbnail(
             modifier = Modifier.size(size),
             contentAlignment = Alignment.Center
         ) {
-            // Face image with crop transformation
+            // Face image with crop transformation to show just the face
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(Uri.parse(person.photoUri))
                     .memoryCachePolicy(CachePolicy.ENABLED)
                     .diskCachePolicy(CachePolicy.ENABLED)
                     .crossfade(true)
+                    .transformations(
+                        FaceCropTransformation(
+                            left = person.boundingBoxLeft,
+                            top = person.boundingBoxTop,
+                            right = person.boundingBoxRight,
+                            bottom = person.boundingBoxBottom,
+                            padding = 0.3f  // Add 30% padding around face
+                        )
+                    )
                     .build(),
-                contentDescription = person.name ?: "Person",
+                contentDescription = person.getDisplayName(),
                 modifier = Modifier
                     .size(size)
                     .clip(CircleShape)
@@ -111,7 +162,7 @@ fun FaceThumbnail(
         if (showName) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = person.name ?: "Unknown",
+                text = person.getDisplayName(),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.8f),
                 maxLines = 1,
@@ -140,8 +191,17 @@ fun SmallFaceThumbnail(
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
             .crossfade(true)
+            .transformations(
+                FaceCropTransformation(
+                    left = person.boundingBoxLeft,
+                    top = person.boundingBoxTop,
+                    right = person.boundingBoxRight,
+                    bottom = person.boundingBoxBottom,
+                    padding = 0.25f
+                )
+            )
             .build(),
-        contentDescription = person.name ?: "Person",
+        contentDescription = person.getDisplayName(),
         modifier = modifier
             .size(size)
             .clip(CircleShape)
@@ -180,7 +240,7 @@ fun PersonFilterChip(
             Spacer(modifier = Modifier.width(8.dp))
 
             Text(
-                text = if (isSelected) "Only them" else person.name ?: "Add",
+                text = if (isSelected) "Only them" else person.getDisplayName(),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White
             )
@@ -352,8 +412,17 @@ private fun FaceThumbnailGridItem(
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
             .crossfade(true)
+            .transformations(
+                FaceCropTransformation(
+                    left = person.boundingBoxLeft,
+                    top = person.boundingBoxTop,
+                    right = person.boundingBoxRight,
+                    bottom = person.boundingBoxBottom,
+                    padding = 0.25f
+                )
+            )
             .build(),
-        contentDescription = person.name ?: "Person",
+        contentDescription = person.getDisplayName(),
         modifier = modifier
             .aspectRatio(1f)
             .clip(CircleShape)

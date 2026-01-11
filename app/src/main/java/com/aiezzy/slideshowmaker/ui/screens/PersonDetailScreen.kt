@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,16 +53,41 @@ fun PersonDetailScreen(
     onNavigateBack: () -> Unit,
     onCreateSlideshow: (List<Uri>) -> Unit
 ) {
-    val context = LocalContext.current
     val currentPerson by viewModel.currentPerson.collectAsState()
     val selectedPersonIds by viewModel.selectedPersonIds.collectAsState()
     val filteredPhotos by viewModel.filteredPhotos.collectAsState()
     val isLoadingPhotos by viewModel.isLoadingPhotos.collectAsState()
-    val allPersons by viewModel.persons.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val undoAction by viewModel.undoAction.collectAsState()
+    val onlyThemMode by viewModel.onlyThemMode.collectAsState()
+
+    // Snackbar host state
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Collect error/success messages
+    LaunchedEffect(Unit) {
+        viewModel.errorMessage.collect { message ->
+            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+        }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.successMessage.collect { message ->
+            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+        }
+    }
+
+    // Extract persons from UI state
+    val allPersons = when (val state = uiState) {
+        is PeopleViewModel.PeopleUiState.Success -> state.persons
+        else -> emptyList()
+    }
 
     // Selected photos for slideshow
     var selectedPhotos by remember { mutableStateOf<Set<Uri>>(emptySet()) }
     var isSelectionMode by remember { mutableStateOf(false) }
+
+    // Remove from group dialog state
+    var photoToRemove by remember { mutableStateOf<Uri?>(null) }
 
     // Load person on first composition
     LaunchedEffect(personId) {
@@ -90,7 +116,7 @@ fun PersonDetailScreen(
                         }
                     }) {
                         Icon(
-                            imageVector = if (isSelectionMode) Icons.Default.Close else Icons.Default.ArrowBack,
+                            imageVector = if (isSelectionMode) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = Color.White
                         )
@@ -191,6 +217,39 @@ fun PersonDetailScreen(
                 }
             }
         },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                // Undo snackbar
+                undoAction?.let { action ->
+                    Snackbar(
+                        modifier = Modifier.padding(16.dp),
+                        action = {
+                            TextButton(onClick = { viewModel.executeUndo() }) {
+                                Text("Undo", color = AccentYellow)
+                            }
+                        },
+                        dismissAction = {
+                            IconButton(onClick = { viewModel.dismissUndo() }) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Dismiss",
+                                    tint = Color.White
+                                )
+                            }
+                        },
+                        containerColor = CardBackground,
+                        contentColor = Color.White
+                    ) {
+                        Text(action.message)
+                    }
+                } ?: Snackbar(
+                    snackbarData = data,
+                    containerColor = CardBackground,
+                    contentColor = Color.White,
+                    actionColor = AccentYellow
+                )
+            }
+        },
         containerColor = DarkBackground
     ) { paddingValues ->
         Column(
@@ -218,6 +277,17 @@ fun PersonDetailScreen(
                     }
                 }
 
+                // "Only them" filter toggle chip
+                currentPerson?.let { person ->
+                    item {
+                        OnlyThemFilterChip(
+                            personName = person.getDisplayName(),
+                            isEnabled = onlyThemMode,
+                            onClick = { viewModel.toggleOnlyThemMode() }
+                        )
+                    }
+                }
+
                 // Add more people chips (unselected)
                 items(allPersons.filter { it.personId !in selectedPersonIds }.take(5)) { person ->
                     AddPersonChip(
@@ -233,7 +303,7 @@ fun PersonDetailScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = person.name ?: "Unknown",
+                        text = person.getDisplayName(),
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
@@ -280,18 +350,14 @@ fun PersonDetailScreen(
                                         selectedPhotos + photoUri
                                     }
                                 } else {
-                                    // Long press to start selection
+                                    // Tap to start selection
                                     isSelectionMode = true
                                     selectedPhotos = setOf(photoUri)
                                 }
                             },
                             onLongClick = {
-                                isSelectionMode = true
-                                selectedPhotos = if (photoUri in selectedPhotos) {
-                                    selectedPhotos - photoUri
-                                } else {
-                                    selectedPhotos + photoUri
-                                }
+                                // Long press shows remove from group option
+                                photoToRemove = photoUri
                             }
                         )
                     }
@@ -325,6 +391,19 @@ fun PersonDetailScreen(
                 }
             }
         }
+    }
+
+    // Remove from group dialog
+    photoToRemove?.let { photo ->
+        RemoveFromGroupDialog(
+            photoUri = photo,
+            personName = currentPerson?.getDisplayName() ?: "this person",
+            onDismiss = { photoToRemove = null },
+            onConfirm = {
+                viewModel.removePhotoFromPerson(photo, personId)
+                photoToRemove = null
+            }
+        )
     }
 }
 
@@ -361,7 +440,55 @@ private fun AddPersonChip(
 }
 
 /**
- * Photo grid item with selection state
+ * Toggle chip for "Only them" filter mode
+ * Shows photos where only the selected person appears (no other people in photo)
+ */
+@Composable
+private fun OnlyThemFilterChip(
+    personName: String,
+    isEnabled: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
+        color = if (isEnabled) AccentYellow else Color.Transparent,
+        shape = RoundedCornerShape(24.dp),
+        border = if (isEnabled) null else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (isEnabled) Icons.Default.Person else Icons.Default.PersonOutline,
+                contentDescription = null,
+                tint = if (isEnabled) Color.Black else Color.White.copy(alpha = 0.7f),
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (isEnabled) "Only $personName" else "Only them",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isEnabled) Color.Black else Color.White.copy(alpha = 0.7f),
+                fontWeight = if (isEnabled) FontWeight.SemiBold else FontWeight.Normal
+            )
+        }
+    }
+}
+
+/**
+ * Photo grid item with selection state and optional quality indicator.
+ *
+ * @param uri The photo URI
+ * @param isSelected Whether the photo is selected
+ * @param isSelectionMode Whether selection mode is active
+ * @param isLowQuality Whether the face in this photo is low quality (DISPLAY_ONLY tier)
+ *                     NOTE: To enable this, modify FaceRepository.getPhotosForPerson() to return
+ *                     PhotoWithQuality instead of String, and update PeopleViewModel accordingly.
+ * @param onClick Callback when photo is tapped
+ * @param onLongClick Callback when photo is long-pressed
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -369,6 +496,7 @@ private fun PhotoGridItem(
     uri: Uri,
     isSelected: Boolean,
     isSelectionMode: Boolean,
+    isLowQuality: Boolean = false,  // TODO: Pass actual quality from data layer
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -402,6 +530,15 @@ private fun PhotoGridItem(
             contentScale = ContentScale.Crop
         )
 
+        // Low quality face indicator badge
+        if (isLowQuality && !isSelectionMode) {
+            LowQualityBadge(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(4.dp)
+            )
+        }
+
         // Selection checkbox
         if (isSelectionMode) {
             Box(
@@ -427,4 +564,111 @@ private fun PhotoGridItem(
             }
         }
     }
+}
+
+/**
+ * Badge indicating a low-quality face detection.
+ * Shows when the face in the photo was detected with DISPLAY_ONLY quality tier
+ * (blurry, poor lighting, extreme pose, etc.)
+ */
+@Composable
+private fun LowQualityBadge(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(4.dp),
+        color = Color.Black.copy(alpha = 0.7f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.BlurOn,
+                contentDescription = "Low quality",
+                tint = Color.Yellow.copy(alpha = 0.9f),
+                modifier = Modifier.size(12.dp)
+            )
+            Spacer(modifier = Modifier.width(2.dp))
+            Text(
+                text = "LQ",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.9f)
+            )
+        }
+    }
+}
+
+/**
+ * Dialog for removing a photo from a person's group
+ */
+@Composable
+private fun RemoveFromGroupDialog(
+    photoUri: Uri,
+    personName: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardBackground,
+        title = {
+            Text(
+                text = "Remove from group?",
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Column {
+                // Photo preview
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(photoUri)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "This photo will be removed from \"$personName\" group. The photo won't be deleted from your device.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = Color.Red.copy(alpha = 0.9f)
+                )
+            ) {
+                Text("Remove", fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = Color.White.copy(alpha = 0.7f)
+                )
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }

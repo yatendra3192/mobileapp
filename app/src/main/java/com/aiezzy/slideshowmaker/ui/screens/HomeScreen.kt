@@ -220,11 +220,16 @@ private fun NewHomeLayout(
     onNavigateToPeople: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // People state
-    val persons = peopleViewModel?.persons?.collectAsState()?.value ?: emptyList()
-    val scanProgress = peopleViewModel?.scanProgress?.collectAsState()?.value
+    // People state - extract from MVI ui states
+    val uiState = peopleViewModel?.uiState?.collectAsState()?.value
+    val scanState = peopleViewModel?.scanState?.collectAsState()?.value
     val isScanRunning = peopleViewModel?.isScanRunning?.collectAsState()?.value ?: false
     val scanPercentage = peopleViewModel?.scanPercentage?.collectAsState()?.value ?: 0f
+
+    val persons = when (uiState) {
+        is PeopleViewModel.PeopleUiState.Success -> uiState.persons
+        else -> emptyList()
+    }
     Column(
         modifier = modifier
             .fillMaxSize()

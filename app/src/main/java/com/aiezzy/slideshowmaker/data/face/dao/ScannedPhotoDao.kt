@@ -7,10 +7,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ScannedPhotoDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(photo: ScannedPhotoEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(photos: List<ScannedPhotoEntity>)
 
     @Update
@@ -48,4 +48,22 @@ interface ScannedPhotoDao {
 
     @Query("UPDATE scanned_photos SET scanStatus = :status, lastScanned = :timestamp WHERE photoUri = :uri")
     suspend fun updateStatus(uri: String, status: String, timestamp: Long)
+
+    /**
+     * Reset a photo to PENDING status for retry (clears lastScanned).
+     */
+    @Query("UPDATE scanned_photos SET scanStatus = 'PENDING', lastScanned = NULL WHERE photoUri = :uri")
+    suspend fun resetToPending(uri: String)
+
+    /**
+     * Get count of failed photos.
+     */
+    @Query("SELECT COUNT(*) FROM scanned_photos WHERE scanStatus = 'FAILED'")
+    suspend fun getFailedCount(): Int
+
+    /**
+     * Get all failed photos for retry or review.
+     */
+    @Query("SELECT * FROM scanned_photos WHERE scanStatus = 'FAILED' ORDER BY lastScanned DESC")
+    suspend fun getFailedPhotos(): List<ScannedPhotoEntity>
 }
