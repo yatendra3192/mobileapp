@@ -96,7 +96,7 @@ android {
             // x86/x86_64 are mainly for emulators
             include("armeabi-v7a", "arm64-v8a", "x86_64")
             // Set to true to also generate a universal APK (larger, but works everywhere)
-            isUniversalApk = false
+            isUniversalApk = true
         }
     }
 

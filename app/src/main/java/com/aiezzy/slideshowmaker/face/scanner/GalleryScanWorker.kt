@@ -465,6 +465,19 @@ class GalleryScanWorker @AssistedInject constructor(
     }
 
     /**
+     * Safely update foreground notification. Catches exceptions to prevent crashes
+     * on devices where foreground service may not be available.
+     */
+    private suspend fun updateForegroundSafe(progress: String) {
+        try {
+            setForeground(createForegroundInfo(progress))
+        } catch (e: Exception) {
+            // Silently ignore - foreground service not available
+            Log.v(TAG, "Foreground update skipped: ${e.message}")
+        }
+    }
+
+    /**
      * Create ForegroundInfo for running as a foreground service.
      * This allows scanning to continue even when app is closed.
      */
@@ -490,7 +503,12 @@ class GalleryScanWorker @AssistedInject constructor(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
             // Run as foreground service so scanning continues when app is closed
-            setForeground(createForegroundInfo("Starting scan..."))
+            try {
+                setForeground(createForegroundInfo("Starting scan..."))
+            } catch (e: Exception) {
+                // Foreground service may fail on some devices, continue without it
+                Log.w(TAG, "Failed to start foreground service, continuing in background: ${e.message}")
+            }
 
             val forceRescan = inputData.getBoolean(KEY_FORCE_RESCAN, false)
             val resumeScan = inputData.getBoolean(KEY_RESUME_SCAN, false)
@@ -693,7 +711,7 @@ class GalleryScanWorker @AssistedInject constructor(
                 val progressPercent = (100 * scannedCount / photos.size)
                 val etaMinutes = etaSeconds / 60
                 val notificationText = "$scannedCount/${photos.size} photos ($progressPercent%), $totalFaces faces found, ETA: ${etaMinutes}m"
-                setForeground(createForegroundInfo(notificationText))
+                updateForegroundSafe(notificationText)
 
                 // Save checkpoint periodically
                 if (scannedCount - lastCheckpointScanned >= CHECKPOINT_INTERVAL) {
@@ -746,7 +764,7 @@ class GalleryScanWorker @AssistedInject constructor(
 
             // Run batch clustering on ALL detected faces
             Log.i(TAG, "Starting batch clustering on all detected faces...")
-            setForeground(createForegroundInfo("Grouping faces... ($totalFaces faces)"))
+            updateForegroundSafe("Grouping faces... ($totalFaces faces)")
             try {
                 val clusteringResult = batchClusteringService.runBatchClustering()
                 Log.i(TAG, "Batch clustering: ${clusteringResult.clusteredFaces} faces in ${clusteringResult.clustersCreated} clusters (${clusteringResult.durationMs}ms)")
@@ -761,7 +779,7 @@ class GalleryScanWorker @AssistedInject constructor(
             // - Recalculate photo counts
             // - Fix orphaned clusters
             Log.i(TAG, "Starting cluster refinement pipeline...")
-            setForeground(createForegroundInfo("Refining groups..."))
+            updateForegroundSafe("Refining groups...")
             val refinementResult = repository.runRefinementPipeline()
 
             Log.i(TAG, "Refinement pipeline complete: " +
@@ -785,12 +803,12 @@ class GalleryScanWorker @AssistedInject constructor(
             // Reassign thumbnails to best faces (prioritizing visible eyes and quality)
             // This ensures thumbnails show actual faces, not hair/back of head
             Log.i(TAG, "Reassigning thumbnails to best faces...")
-            setForeground(createForegroundInfo("Selecting best thumbnails..."))
+            updateForegroundSafe("Selecting best thumbnails...")
             val thumbnailUpdates = repository.reassignAllThumbnails()
             Log.i(TAG, "Reassigned $thumbnailUpdates thumbnails to best faces")
 
             // Final notification
-            setForeground(createForegroundInfo("Scan complete! $totalFaces faces found"))
+            updateForegroundSafe("Scan complete! $totalFaces faces found")
 
             // Cleanup expired history
             repository.cleanupExpiredHistory()

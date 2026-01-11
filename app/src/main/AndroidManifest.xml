@@ -55,6 +55,13 @@
             android:foregroundServiceType="dataSync"
             android:exported="false" />
 
+        <!-- WorkManager Foreground Service for background scanning -->
+        <!-- Required for Android 14+ to run foreground work -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
         <!-- Disable default WorkManager initialization (using Hilt's Configuration.Provider) -->
         <provider
             android:name="androidx.startup.InitializationProvider"
