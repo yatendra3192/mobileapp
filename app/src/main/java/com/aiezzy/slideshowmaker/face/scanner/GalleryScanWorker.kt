@@ -1,15 +1,20 @@
 package com.aiezzy.slideshowmaker.face.scanner
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ServiceInfo
 import android.os.BatteryManager
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.*
+import com.aiezzy.slideshowmaker.R
 import com.aiezzy.slideshowmaker.data.face.entities.ScannedPhotoEntity
 import com.aiezzy.slideshowmaker.data.face.entities.ScanStatus
 import com.aiezzy.slideshowmaker.face.FaceRepository
@@ -62,6 +67,10 @@ class GalleryScanWorker @AssistedInject constructor(
         const val KEY_PROGRESS_MEMORY_PRESSURE = "progress_memory_pressure"
         const val KEY_PROGRESS_BATCH_SIZE = "progress_batch_size"
 
+        // Foreground service notification
+        private const val NOTIFICATION_CHANNEL_ID = "face_scan_channel"
+        private const val NOTIFICATION_ID = 1001
+
         // Batch size limits (adjusted by memory and battery)
         // OPTIMIZED FOR 50K+ GALLERIES - Increased limits for faster processing
         private const val MAX_BATCH_SIZE = 100      // Increased from 50 for large galleries
@@ -70,9 +79,9 @@ class GalleryScanWorker @AssistedInject constructor(
 
         // Parallel processing configuration
         // OPTIMIZED: Modern phones have 8+ cores, can safely process more in parallel
-        private const val MAX_PARALLEL_PHOTOS = 12   // Increased from 8 for faster processing
-        private const val MIN_PARALLEL_PHOTOS = 4    // Increased from 2 for better baseline
-        private const val DEFAULT_PARALLEL_PHOTOS = 6 // Increased from 4
+        private const val MAX_PARALLEL_PHOTOS = 16   // Increased for faster processing on high-end devices
+        private const val MIN_PARALLEL_PHOTOS = 6    // Better baseline for efficiency
+        private const val DEFAULT_PARALLEL_PHOTOS = 10 // Higher default for faster throughput
 
         // Battery multipliers for batch size
         private const val BATTERY_CHARGING_MULTIPLIER = 2.0f   // More aggressive when charging
@@ -385,11 +394,11 @@ class GalleryScanWorker @AssistedInject constructor(
             MemoryMonitor.MemoryPressure.CRITICAL -> 0.25f
         }
 
-        // Adjust for battery
+        // Adjust for battery - more aggressive when charging for faster scanning
         val batteryMultiplier = when {
-            isCharging -> 1.5f
-            batteryLevel > 50 -> 1.0f
-            batteryLevel > 20 -> 0.75f
+            isCharging -> 2.0f   // Double parallelism when charging
+            batteryLevel > 50 -> 1.2f
+            batteryLevel > 20 -> 0.8f
             else -> 0.5f
         }
 
@@ -437,8 +446,52 @@ class GalleryScanWorker @AssistedInject constructor(
         return RETRY_BASE_DELAY_MS * (1 shl minOf(attempt, 5))  // Cap at 32 seconds
     }
 
+    /**
+     * Create notification channel for foreground service (required for Android O+)
+     */
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "Face Scanning",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows progress while scanning photos for faces"
+                setShowBadge(false)
+            }
+            val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    /**
+     * Create ForegroundInfo for running as a foreground service.
+     * This allows scanning to continue even when app is closed.
+     */
+    private fun createForegroundInfo(progress: String = "Scanning photos..."): ForegroundInfo {
+        createNotificationChannel()
+
+        val notification = NotificationCompat.Builder(applicationContext, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("Scanning for faces")
+            .setContentText(progress)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .build()
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(NOTIFICATION_ID, notification)
+        }
+    }
+
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
+            // Run as foreground service so scanning continues when app is closed
+            setForeground(createForegroundInfo("Starting scan..."))
+
             val forceRescan = inputData.getBoolean(KEY_FORCE_RESCAN, false)
             val resumeScan = inputData.getBoolean(KEY_RESUME_SCAN, false)
 
@@ -636,6 +689,12 @@ class GalleryScanWorker @AssistedInject constructor(
                         .build()
                 )
 
+                // Update foreground notification with progress
+                val progressPercent = (100 * scannedCount / photos.size)
+                val etaMinutes = etaSeconds / 60
+                val notificationText = "$scannedCount/${photos.size} photos ($progressPercent%), $totalFaces faces found, ETA: ${etaMinutes}m"
+                setForeground(createForegroundInfo(notificationText))
+
                 // Save checkpoint periodically
                 if (scannedCount - lastCheckpointScanned >= CHECKPOINT_INTERVAL) {
                     saveCheckpoint(scannedCount, totalFaces, failedCount)
@@ -687,6 +746,7 @@ class GalleryScanWorker @AssistedInject constructor(
 
             // Run batch clustering on ALL detected faces
             Log.i(TAG, "Starting batch clustering on all detected faces...")
+            setForeground(createForegroundInfo("Grouping faces... ($totalFaces faces)"))
             try {
                 val clusteringResult = batchClusteringService.runBatchClustering()
                 Log.i(TAG, "Batch clustering: ${clusteringResult.clusteredFaces} faces in ${clusteringResult.clustersCreated} clusters (${clusteringResult.durationMs}ms)")
@@ -701,6 +761,7 @@ class GalleryScanWorker @AssistedInject constructor(
             // - Recalculate photo counts
             // - Fix orphaned clusters
             Log.i(TAG, "Starting cluster refinement pipeline...")
+            setForeground(createForegroundInfo("Refining groups..."))
             val refinementResult = repository.runRefinementPipeline()
 
             Log.i(TAG, "Refinement pipeline complete: " +
@@ -724,8 +785,12 @@ class GalleryScanWorker @AssistedInject constructor(
             // Reassign thumbnails to best faces (prioritizing visible eyes and quality)
             // This ensures thumbnails show actual faces, not hair/back of head
             Log.i(TAG, "Reassigning thumbnails to best faces...")
+            setForeground(createForegroundInfo("Selecting best thumbnails..."))
             val thumbnailUpdates = repository.reassignAllThumbnails()
             Log.i(TAG, "Reassigned $thumbnailUpdates thumbnails to best faces")
+
+            // Final notification
+            setForeground(createForegroundInfo("Scan complete! $totalFaces faces found"))
 
             // Cleanup expired history
             repository.cleanupExpiredHistory()
