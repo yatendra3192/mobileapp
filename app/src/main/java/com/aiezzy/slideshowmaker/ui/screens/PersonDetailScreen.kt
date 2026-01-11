@@ -192,7 +192,7 @@ fun PersonDetailScreen(
                     Button(
                         onClick = {
                             isSelectionMode = true
-                            selectedPhotos = filteredPhotos.toSet()  // Select all by default
+                            selectedPhotos = emptySet()  // Start with no selection, let user select
                         },
                         modifier = Modifier
                             .fillMaxWidth()
