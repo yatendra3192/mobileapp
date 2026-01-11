@@ -319,48 +319,83 @@ fun PreviewScreen(
                         }
                     }
 
-                    // Save button - Yellow accent
-                    Button(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch {
-                                isSaving = true
-                                saveSuccess = saveVideoToGallery(context, videoPath)
-                                isSaving = false
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .semantics { contentDescription = "Save video to gallery" },
-                        enabled = !isSaving,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = AccentYellow,
-                            contentColor = Color.Black
-                        )
+                    // Save and Share buttons in a row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Color.Black,
-                                strokeWidth = 2.dp
+                        // Save button - Yellow accent
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                scope.launch {
+                                    isSaving = true
+                                    saveSuccess = saveVideoToGallery(context, videoPath)
+                                    isSaving = false
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                                .semantics { contentDescription = "Save video to gallery" },
+                            enabled = !isSaving,
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AccentYellow,
+                                contentColor = Color.Black
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                "Saving...",
-                                style = AiezzyType.titleMedium,
-                                fontWeight = FontWeight.SemiBold
+                        ) {
+                            if (isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = Color.Black,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Saving...",
+                                    style = AiezzyType.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Download,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Save",
+                                    style = AiezzyType.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        // Share button
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                shareVideo(context, videoPath)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                                .semantics { contentDescription = "Share video to other apps" },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = CardBackground,
+                                contentColor = Color.White
                             )
-                        } else {
+                        ) {
                             Icon(
-                                Icons.Default.Download,
+                                Icons.Default.Share,
                                 contentDescription = null,
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "Save to Gallery",
+                                "Share",
                                 style = AiezzyType.titleMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
